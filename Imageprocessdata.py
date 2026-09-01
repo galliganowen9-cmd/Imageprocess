@@ -1,0 +1,142 @@
+import numpy as np
+from PIL import Image, ImageEnhance, Image
+import math
+import os
+import sys
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Agg')
+
+NUM_LEDS = 129
+DIVISIONS = 389
+STRIPS = 6
+
+PHASE_OFFSET_DEG = 0.0
+REVERSE_DIVISIONS = False
+STRIP_PHASES_DEG = [0.0, 120.0, 240.0]
+
+
+def translate_image_three_strips(img):
+    img = img.convert("RGB")
+    w0, h0 = img.size
+    max_dim = max(w0, h0)
+    new_size = (int((w0 / max_dim) * 1200), int((h0 / max_dim) * 1200))
+    img = img.resize(new_size, resample=Image.BICUBIC)
+    img = ImageEnhance.Color(img).enhance(2.0)
+
+    arr = np.asarray(img, dtype=np.uint8)
+    h, w, _ = arr.shape
+
+    min_dim = min(w, h)
+    cx, cy = w / 2.0, h / 2.0
+    half = min_dim / 2.0
+    x_min, x_max = cx - half, cx + half
+    y_min, y_max = cy - half, cy + half
+
+    data = np.zeros((DIVISIONS, STRIPS, NUM_LEDS, 3), dtype=np.uint8)
+
+    step = 2.0 * math.pi / DIVISIONS
+    phase = math.radians(PHASE_OFFSET_DEG)
+
+    for t in range(DIVISIONS):
+        tt = (DIVISIONS - 1 - t) if REVERSE_DIVISIONS else t
+        base_theta = tt * step - math.pi / 2.0 + phase
+
+        for s, deg in enumerate(STRIP_PHASES_DEG):
+            theta = base_theta + math.radians(deg)
+            cos_t, sin_t = math.cos(theta), math.sin(theta)
+
+            for l in range(NUM_LEDS):
+                r = l / (NUM_LEDS - 1)
+
+                x_raw = cos_t * r
+                y_raw = sin_t * r
+
+                x = np.interp(x_raw, [-1.0, 1.0], [x_min, x_max])
+                y = np.interp(y_raw, [-1.0, 1.0], [y_min, y_max])
+
+                xi = int(np.clip(x, 0, w - 1))
+                yi = int(np.clip(y, 0, h - 1))
+
+                data[t, s, l] = arr[yi, xi]
+    plt.imshow(arr)
+    plt.title("Original image")
+    plt.savefig("Origimage.png")
+    plt.imshow(data[:, 2, :, :])
+    plt.title("Data for jack script")
+    plt.savefig("LEDMATRIX.png")
+    
+    # ----- RECONSTRUCT STRIP 1 BACK INTO CIRCLE -----
+
+    strip_index = 2  # same strip you plotted
+
+    radius = NUM_LEDS - 1
+    recon_size = 2 * radius + 1
+    recon = np.zeros((recon_size, recon_size, 3), dtype=np.uint8)
+
+    cx_r = recon_size // 2
+    cy_r = recon_size // 2
+    radius = recon_size // 2
+
+    step = 2.0 * math.pi / DIVISIONS
+    phase = math.radians(PHASE_OFFSET_DEG)
+
+    for t in range(DIVISIONS):
+        tt = (DIVISIONS - 1 - t) if REVERSE_DIVISIONS else t
+        base_theta = tt * step - math.pi / 2.0 + phase
+        theta = base_theta + math.radians(STRIP_PHASES_DEG[strip_index])
+
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+
+        for l in range(NUM_LEDS):
+            r = l / (NUM_LEDS - 1)
+
+            x = cx_r + cos_t * r * radius
+            y = cy_r + sin_t * r * radius
+
+            xi = int(np.clip(x, 0, recon_size - 1))
+            yi = int(np.clip(y, 0, recon_size - 1))
+
+            recon[yi, xi] = data[t, strip_index, l]
+
+    plt.imshow(recon)
+    plt.title("Reconstructed Circular Strip")
+    plt.axis("off")
+    plt.savefig("reconstruct.png")
+
+    return data
+
+
+def write_header(path, data):
+    filename = os.path.basename(path)
+    base = os.path.splitext(filename)[0]
+    array_name = base
+    print("header in file path:", path)
+
+    flat = data.flatten()
+
+    with open(path, "w") as f:
+        f.write("#pragma once\n")
+        f.write(f"#define NUM_LEDS {NUM_LEDS}\n")
+        f.write(f"#define DIVISIONS {DIVISIONS}\n")
+        f.write(f"#define STRIPS {STRIPS}\n")
+        f.write(f"const uint8_t PROGMEM {array_name}[] = {{\n")
+
+        for i, val in enumerate(flat):
+            f.write(f"{int(val)},")
+            if (i + 1) % 12 == 0:
+                f.write("\n")
+
+        f.write("};\n")
+
+
+if __name__ == "__main__":
+    input_path = sys.argv[1]
+    print("proccessing:", input_path)
+    img = Image.open(input_path)
+    data = translate_image_three_strips(img)
+    write_header("autoimagedata.h", data)
+
+    expected = DIVISIONS * STRIPS * NUM_LEDS * 3
+    print("Bytes:", data.size, "Expected:", expected, "OK:", data.size == expected)
