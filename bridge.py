@@ -46,6 +46,7 @@ for i in range(0,len(data),4096):
 	chunk = data[i:i+4096]
 	ack1_seen.clear()
 	ack2_seen.clear()
+	ack3_seen.clear()
 	ser.write(chunk)
 	ser.flush()
 	
