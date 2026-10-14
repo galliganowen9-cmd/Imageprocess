@@ -3,7 +3,7 @@
 #include <LittleFS.h>
 
 #define ACK_PIN 19
-
+#define RX_TIMEOUT 5000
 uint32_t imageSize = 0;
 uint32_t received = 0;
 
@@ -61,12 +61,14 @@ void loop() {
 
 
 
-
+  bool transmissionFailed = false;
   while (received < imageSize) {
 
     size_t expected = min((uint32_t)4096, imageSize - received);
 
     size_t chunkReceived = 0;
+    
+    unsigned long lastByteTime = millis();
 
 
     // Keep reading until THIS chunk is complete
@@ -80,20 +82,28 @@ void loop() {
 
         size_t n = Serial2.readBytes(buffer + chunkReceived,toRead);
 
-        chunkReceived += n;
+        if (n>0){
+          chunkRecieved += n;
+          lastByteTime = millis();
+        }
+      }
+      if (millis()-lastByteTime >= RX_TIMEOUT){
+        Serial.println("Transmission fail");
+        transmissionFailed = true;
+        break;
       }
     }
 
 
 
 
-    size_t written =
-      file.write(buffer, chunkReceived);
+    size_t written = file.write(buffer, chunkReceived);
 
     if (written != chunkReceived) {
       Serial.println("FILE WRITE ERROR");
       file.close();
-      return;
+      transmissionFailed = true;
+      break;
     }
 
     received += chunkReceived;
@@ -111,6 +121,19 @@ void loop() {
     digitalWrite(ACK_PIN, HIGH);
     delay(15);
     digitalWrite(ACK_PIN, LOW);
+  }
+  if (transmissionFailed) {
+    digitalWrite(ACK_PIN, LOW);
+    file.close();
+    LittleFS.remove("/image.bin");
+
+    while(Serial2.available() > 0){
+      Serial2.read();
+    }
+    recieved = 0;
+    imageSize = 0;
+    Serial.println("Transmission fail, reciever reset, waiting for new image");
+    return;
   }
 
 
