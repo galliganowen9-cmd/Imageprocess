@@ -3,35 +3,47 @@
 #include <FS.h>
 #include <LittleFS.h>
 
-//#include "image_data_1.h"
-
-#include "image_data_barc_389div.h" //Image included here
 
 #define NUM_LEDS    129
 #define DIVISIONS   300
 #define STRIPS      6
 #define LED_PIN 2
 #define HALL_PIN    27
-const uint8_t DATA_PIN_1 = 21;
-const uint8_t DATA_PIN_2 = 22;
-const uint8_t DATA_PIN_3 = 19;
-const uint8_t DATA_PIN_4 = 25;
-const uint8_t DATA_PIN_5 = 33;
-const uint8_t DATA_PIN_6 = 32; //Pins initialized for fan blades
+#define BOARD_ID 1
+
+#if BOARD_ID == 1
+  const int inda = 0;
+  const int indb = 3;
+
+#elif BOARD_ID == 2
+  const int inda = 1;
+  const int indb = 4;
+
+#elif BOARD_ID == 3
+  const int inda = 2;
+  const int indb = 5;
+
+#endif
+
+
+
+const uint8_t DATA_PIN_A = 21;
+const uint8_t DATA_PIN_B = 25;
+
 
 const uint8_t CLK_PIN    = 18; 
 unsigned long StartTime;
 bool interruptDetached = false;
-//Interrupt pin initialized
-Adafruit_DotStar strip1(NUM_LEDS, DATA_PIN_1, CLK_PIN, DOTSTAR_BRG);
-Adafruit_DotStar strip2(NUM_LEDS, DATA_PIN_2, CLK_PIN, DOTSTAR_BRG);
-Adafruit_DotStar strip3(NUM_LEDS, DATA_PIN_3, CLK_PIN, DOTSTAR_BRG);
-Adafruit_DotStar strip4(NUM_LEDS, DATA_PIN_4, CLK_PIN, DOTSTAR_BRG);
-Adafruit_DotStar strip5(NUM_LEDS, DATA_PIN_5, CLK_PIN, DOTSTAR_BRG);
-Adafruit_DotStar strip6(NUM_LEDS, DATA_PIN_6, CLK_PIN, DOTSTAR_BRG);
+//Interrupt pin initialize
+Adafruit_DotStar stripa(NUM_LEDS, DATA_PIN_A, CLK_PIN, DOTSTAR_BGR);
 
-const size_t SLICE_SIZE = STRIPS*NUM_LEDS*3;
-uint8_t sliceBuffer[SLICE_SIZE];
+Adafruit_DotStar stripb(NUM_LEDS, DATA_PIN_B, CLK_PIN, DOTSTAR_BGR);
+
+const size_t STRIP_SIZE = NUM_LEDS * 3;
+const size_t SLICE_SIZE = STRIPS * STRIP_SIZE;
+
+uint8_t stripBuffer[STRIP_SIZE];
+
 File imageFile;
 int32_t lastDisplayedDiv = -1;
 
@@ -58,49 +70,60 @@ IRAM_ATTR void hallISR() {  //Interrupt function this is irrelevant don't touch
 static inline uint32_t color32(uint8_t r, uint8_t g, uint8_t b) { //Color data (Ithink)
   return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
-//Im not sure what this one does
-void displayDivision(uint16_t div) { 
-  //div %= DIVISIONS;
-  if (div == lastDisplayedDiv){
+
+void displayDivision(uint16_t div) {
+
+  if (div == lastDisplayedDiv) {
     return;
   }
-  lastDisplayedDiv = div;
+
+  
   size_t base = (size_t)div * SLICE_SIZE;
 
-  if(base + SLICE_SIZE > imageFile.size()){
-    Serial.println("ERROR division outside image file");
-    return;
-  }
-  imageFile.seek(base);
+  Adafruit_DotStar* strips[2] = { &stripa, &stripb };
+  const int stripIndices[2] = {inda, indb};
 
-  size_t bytesRead = imageFile.read(sliceBuffer, SLIZE_SIZE);
-  if (bytesRead != SLICE_SIZE){
-    Serial.print("error size mismatch")
-    Serial.println(SLICE_SIZE);
-    Serial.println(bytesRead);
-    return;
-  }
+  for (int s = 0; s < 2; s++) {
 
+    int idxStrip = stripIndices[s];
 
+    // Location of the required strip inside image.bin
+    size_t offset = base + idxStrip * STRIP_SIZE;
 
-  Adafruit_DotStar* strips[STRIPS] = { &strip1, &strip2, &strip3, &strip4, &strip5, &strip6 };
-
-//TODO change this function to skip the bytes not needed
-  for (int s = 0; s < STRIPS; s++) {
-    if (s != 0 && s != 3) {//THIS SKIPS THE UNESSECARY BYTES PLEASE HOLD ON TO THIS
-        continue;
+    if (offset + STRIP_SIZE > imageFile.size()) {
+      Serial.println("ERROR: Outside image file");
+      return;
     }
-    size_t idx = base + s * (NUM_LEDS * 3);
+
+    // Jump directly to this strip's data
+    if (!imageFile.seek(offset)) {
+      Serial.println("ERROR: File seek");
+      return;
+    }
+
+    // Read ONLY the selected strip's bytes
+    size_t bytesRead = imageFile.read(stripBuffer, STRIP_SIZE);
+
+    if (bytesRead != STRIP_SIZE) {
+      Serial.println("ERROR: Size mismatch");
+      return;
+    }
+
+    // Send pixels to the corresponding LED strip
     for (int i = 0; i < NUM_LEDS; i++) {
-      uint8_t r = sliceBuffer[idx + i*3 + 0]; //First use of "readImageByte"
-      uint8_t g = sliceBuffer[idx + i*3 + 1];
-      uint8_t b = sliceBuffer[idx + i*3 + 2];
-      strips[s]->setPixelColor(i, color32(g, r, b));
+
+      uint8_t r = stripBuffer[i * 3 + 0];
+      uint8_t g = stripBuffer[i * 3 + 1];
+      uint8_t b = stripBuffer[i * 3 + 2];
+
+      strips[s]->setPixelColor(i, color32(r, g, b));
     }
+
     strips[s]->show();
   }
-}
 
+  lastDisplayedDiv = div;
+}
 void setup() {
   Serial.begin(115200);
   if(!LittleFS.begin(true)){
@@ -113,23 +136,17 @@ void setup() {
     Serial.println("Can't open image");
     while(1);
   }
-  strip1.begin(); 
-  strip2.begin(); 
-  strip3.begin(); 
-  strip4.begin(); 
-  strip5.begin(); 
-  strip6.begin();
-  strip1.show(); 
-  strip2.show(); 
-  strip3.show(); 
-  strip4.show(); 
-  strip5.show(); 
-  strip6.show();
+  stripa.begin(); 
+  stripb.begin(); 
+  stripa.setBrightness(50);
+  stripb.setBrightness(50);
+  stripa.show(); 
+  stripb.show(); 
+
   pinMode(HALL_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
 
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), hallISR, FALLING);
-  lastSwitch = millis();
   StartTime = millis();
   digitalWrite(LED_PIN, HIGH);
 }
