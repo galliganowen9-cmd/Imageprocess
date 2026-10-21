@@ -4,6 +4,8 @@
 #include <SPI.h>
 #include <FS.h>
 #include <LittleFS.h>
+#include <WiFi.h>
+
 
 // ================= CONFIGURATION =================
 
@@ -14,7 +16,7 @@
 #define LED_PIN     2
 #define HALL_PIN    27
 #define ACK_PIN     19
-#define BOARD_ID    1
+#define BOARD_ID    2
 
 #define RX_TIMEOUT 5000
 
@@ -31,9 +33,10 @@
   const int indb = 5;
 #endif
 
-const uint8_t DATA_PIN_A = 21;
-const uint8_t DATA_PIN_B = 25;
+const uint8_t DATA_PIN_A = 23;
+const uint8_t DATA_PIN_B = 13;
 const uint8_t CLK_PIN = 18;
+const uint8_t CLK_PIN2 = 14;
 
 const size_t STRIP_SIZE = NUM_LEDS * 3;
 const size_t SLICE_SIZE = STRIPS * STRIP_SIZE;
@@ -43,7 +46,7 @@ const size_t SLICE_SIZE = STRIPS * STRIP_SIZE;
 
 // LED strips
 Adafruit_DotStar stripa(NUM_LEDS, DATA_PIN_A, CLK_PIN, DOTSTAR_BGR);
-Adafruit_DotStar stripb(NUM_LEDS, DATA_PIN_B, CLK_PIN, DOTSTAR_BGR);
+Adafruit_DotStar stripb(NUM_LEDS, DATA_PIN_B, CLK_PIN2, DOTSTAR_BGR);
 
 // Image display variables
 File imageFile;
@@ -66,9 +69,9 @@ const float ANGLE_OFFSET_DEG = 80.0f;
 // ================= HALL INTERRUPT =================
 
 IRAM_ATTR void hallISR() {
-
   uint32_t now = micros();
   uint32_t dt = now - last_pulse_us;
+  
 
   if (dt > DEBOUNCE_US) {
     if (period_us == 0) {
@@ -217,9 +220,12 @@ void receiveImage() {
 
       Serial.print("Expected size: ");
       Serial.println(imageSize);
+      if (storedSize == imageSize){
+        digitalWrite(LED_PIN,HIGH);
+        delay(15);
+        digitalWrite(LED_PIN,LOW);
+      }
 
-      Serial.print("Stored file size: ");
-      Serial.println(storedSize);
 
       if (storedSize != imageSize) {
         transmissionFailed = true;
@@ -275,6 +281,7 @@ void displayDivision(uint16_t div) {
 
   Adafruit_DotStar* strips[2] = { &stripa, &stripb };
   const int stripIndices[2] = {inda, indb};
+  
 
   for (int s = 0; s < 2; s++) {
 
@@ -326,6 +333,7 @@ void updateDisplay() {
   if (!imageFile) {
     return;
   }
+  
 
   uint32_t pulse;
   uint32_t period;
@@ -358,6 +366,9 @@ void updateDisplay() {
 void setup() {
 
   Serial.begin(115200);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
 
   // Initialize acknowledgement pin
   pinMode(ACK_PIN, OUTPUT);
@@ -395,7 +406,6 @@ void setup() {
     FALLING
   );
 
-  digitalWrite(LED_PIN, HIGH);
 
   // Load existing image if available
   openImage();
@@ -413,7 +423,9 @@ void loop() {
     receiveImage();
     return;
   }
+  
 
   // Display image normally
   updateDisplay();
 }
+
