@@ -43,10 +43,11 @@ const size_t SLICE_SIZE = STRIPS * STRIP_SIZE;
 
 
 // ================= GLOBAL VARIABLES =================
-
+SPIClass vspi(VSPI);
+SPIClass hspi(HSPI);
 // LED strips
-Adafruit_DotStar stripa(NUM_LEDS, DATA_PIN_A, CLK_PIN, DOTSTAR_BGR);
-Adafruit_DotStar stripb(NUM_LEDS, DATA_PIN_B, CLK_PIN2, DOTSTAR_BGR);
+Adafruit_DotStar stripa(NUM_LEDS, DOTSTAR_BGR, &vspi);
+Adafruit_DotStar stripb(NUM_LEDS, DOTSTAR_BGR, &hspi);
 
 // Image display variables
 File imageFile;
@@ -69,6 +70,7 @@ const float ANGLE_OFFSET_DEG = 80.0f;
 // ================= HALL INTERRUPT =================
 
 IRAM_ATTR void hallISR() {
+  Serial.println("Interrupt");
   uint32_t now = micros();
   uint32_t dt = now - last_pulse_us;
   
@@ -387,6 +389,8 @@ void setup() {
   Serial.println("LittleFS mounted");
 
   // Initialize LED strips
+  vspi.begin(18, -1, 23, -1);
+  hspi.begin(14, -1, 13, -1);
   stripa.begin();
   stripb.begin();
 
