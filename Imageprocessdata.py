@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 
 NUM_LEDS = 129
-DIVISIONS = 389
+DIVISIONS = 300
 STRIPS = 6
 
 PHASE_OFFSET_DEG = 0.0
 REVERSE_DIVISIONS = False
-STRIP_PHASES_DEG = [0.0, 120.0, 240.0]
+STRIP_PHASES_DEG = [0.0, 60.0, 120.0, 180.0,  240.0, 300.0]
 
 
 def translate_image_three_strips(img):
@@ -61,14 +61,14 @@ def translate_image_three_strips(img):
                 data[t, s, l] = arr[yi, xi]
     plt.imshow(arr)
     plt.title("Original image")
-    plt.savefig("Origimage.png")
+    plt.savefig("/home/lsf/Imageprocess/pictures/Origimage.png")
     plt.imshow(data[:, 2, :, :])
     plt.title("Data for jack script")
-    plt.savefig("LEDMATRIX.png")
+    plt.savefig("/home/lsf/Imageprocess/pictures/LEDMATRIX.png")
     
     # ----- RECONSTRUCT STRIP 1 BACK INTO CIRCLE -----
 
-    strip_index = 2  # same strip you plotted
+    strip_index = 2  
 
     radius = NUM_LEDS - 1
     recon_size = 2 * radius + 1
@@ -103,7 +103,7 @@ def translate_image_three_strips(img):
     plt.imshow(recon)
     plt.title("Reconstructed Circular Strip")
     plt.axis("off")
-    plt.savefig("reconstruct.png")
+    plt.savefig("/home/lsf/Imageprocess/pictures/reconstruct.png")
 
     return data
 
@@ -111,7 +111,7 @@ def translate_image_three_strips(img):
 def write_header(path, data):
     filename = os.path.basename(path)
     base = os.path.splitext(filename)[0]
-    array_name = base
+    array_name = "autoimagedata"
     print("header in file path:", path)
 
     flat = data.flatten()
@@ -134,9 +134,15 @@ def write_header(path, data):
 if __name__ == "__main__":
     input_path = sys.argv[1]
     print("proccessing:", input_path)
-    img = Image.open(input_path)
-    data = translate_image_three_strips(img)
-    write_header("autoimagedata.h", data)
+    filename = os.path.basename(input_path)
+    base = os.path.splitext(filename)[0]
+    output_path = os.path.join(
+        "/home/lsf/Imageprocess/headerfiles",
+        base + ".h"
+    )
+    with Image.open(input_path) as img:
+        data = translate_image_three_strips(img)
+    write_header(output_path,data)
 
     expected = DIVISIONS * STRIPS * NUM_LEDS * 3
     print("Bytes:", data.size, "Expected:", expected, "OK:", data.size == expected)
