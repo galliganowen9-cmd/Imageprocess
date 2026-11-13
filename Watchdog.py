@@ -75,8 +75,10 @@ bin_observer = Observer()
 
 image_observer.schedule(ImageHandler(),path = UPLOAD_DIR,recursive = False)
 header_observer.schedule(HeaderHandler(),path = PROCESS_DIR,recursive = False)
+bin_observer.schedule(BinHandler(), path = BIN_DIR, recursive = False)
 image_observer.start()
 header_observer.start()
+bin_observer.start()
 
 print("watching directory")
 
@@ -88,5 +90,7 @@ except KeyboardInterrupt:
 finally:
     image_observer.stop()
     header_observer.stop()
+    bin_observer.stop()
 image_observer.join()
 header_observer.join()
+bin_observer.join()
