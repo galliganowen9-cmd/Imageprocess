@@ -4,6 +4,7 @@ from pathlib import Path
 from gpiozero import DigitalInputDevice
 from threading import Event
 from time import monotonic
+ 
 
 # ================= CONFIGURATION =================
 PORT = "/dev/ttyUSB0"

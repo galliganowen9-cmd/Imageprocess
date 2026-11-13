@@ -5,6 +5,7 @@ import os
 import subprocess
 UPLOAD_DIR = "/home/lsf/fanpov/uploads"
 PROCESS_DIR = "/home/lsf/Imageprocess/headerfiles"
+BIN_DIR = "/home/lsf/Imageprocess/binfiles"
 def wait_until_ready(path):
     size = -1
     while True:
@@ -44,14 +45,32 @@ class HeaderHandler(FileSystemEventHandler):
         try:
             subprocess.run([
                 "python3",
-                "/home/lsf/Imageprocess/bridge.py",
+                "/home/lsf/Imageprocess/mediator.py",
                 file_path
             ], cwd = PROCESS_DIR, check = True)
         except subprocess.CalledProcessError as e:
-            print("Transmission failed", e, flush = True)
+            print("split failed", e, flush = True)
+            
+class BinHandler(FileSystemEventHandler):
+    def on_closed(self, event):
+        if event.is_directory:
+            return
+        filename = os.path.basename(event.src_path)
+        file_path = event.src_path
+        if not filename.endswith(".bin"):
+            return
+        try:
+            subprocess.run([
+                "python3",
+                "/home/lsf/Imageprocess/bridge.py",
+                file_path
+            ], cwd = BIN_DIR, check = True)
+        except subprocess.CalledProcess as e:
+            print("Transmission fail", e, flush = True)
+    
 image_observer = Observer()
 header_observer= Observer()
-
+bin_observer = Observer()
 
 
 image_observer.schedule(ImageHandler(),path = UPLOAD_DIR,recursive = False)
