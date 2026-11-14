@@ -51,22 +51,41 @@ class HeaderHandler(FileSystemEventHandler):
         except subprocess.CalledProcessError as e:
             print("split failed", e, flush = True)
             
+
 class BinHandler(FileSystemEventHandler):
+    def __init__(self):
+        super().__init__()
+        self.required_files = {
+            "board_id1.bin",
+            "board_id2.bin",
+            "board_id3.bin"
+        }
+        self.completed_files = set()
     def on_closed(self, event):
         if event.is_directory:
             return
         filename = os.path.basename(event.src_path)
-        file_path = event.src_path
-        if not filename.endswith(".bin"):
+        if filename not in self.required_files:
             return
+        self.completed_files.add(filename)
+        print(
+            f"Completed: {filename} "
+            f"({len(self.completed_files)}/3)",
+            flush=True
+        )
+        if not self.required_files.issubset(self.completed_files):
+            return
+        print("All three files ready. Starting bridge.", flush=True)
+        self.completed_files.clear()
         try:
             subprocess.run([
                 "python3",
-                "/home/lsf/Imageprocess/bridge.py",
-                file_path
-            ], cwd = BIN_DIR, check = True)
-        except subprocess.CalledProcess as e:
-            print("Transmission fail", e, flush = True)
+                "/home/lsf/Imageprocess/bridge.py"
+            ], cwd=BIN_DIR, check=True)
+
+        except subprocess.CalledProcessError as e:
+            print("Transmission failed:", e, flush=True)
+
     
 image_observer = Observer()
 header_observer= Observer()
