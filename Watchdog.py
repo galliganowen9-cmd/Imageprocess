@@ -56,9 +56,9 @@ class BinHandler(FileSystemEventHandler):
     def __init__(self):
         super().__init__()
         self.required_files = {
-            "board_id1.bin",
-            "board_id2.bin",
-            "board_id3.bin"
+            "image_board1.bin",
+            "image_board2.bin",
+            "image_board3.bin"
         }
         self.completed_files = set()
     def on_closed(self, event):
