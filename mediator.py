@@ -119,8 +119,8 @@ for board_id, (blade_a, blade_b) in enumerate(BOARDS, start=1):
 
     # Save board-specific image
     filename = f"image_board{board_id}.bin"
-
-    Path(filename).write_bytes(output)
+    output_path = Path("/home/lsf/Imageprocess/binfiles") / filename
+    output_path.write_bytes(output)
 
     print(
         f"Board {board_id}: "
