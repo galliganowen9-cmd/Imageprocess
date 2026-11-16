@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 # ==========================================
-# CONFIGURATION
+# Variables
 # ==========================================
 
 NUM_LEDS = 129
@@ -20,7 +20,7 @@ BOARDS = [
 ]
 
 # ==========================================
-# DERIVED CONSTANTS
+# CONSTANTS
 # ==========================================
 
 STRIP_SIZE = NUM_LEDS * BYTES_PER_LED
@@ -36,7 +36,7 @@ BOARD_SLICE_SIZE = STRIPS_PER_BOARD * STRIP_SIZE
 BOARD_IMAGE_SIZE = DIVISIONS * BOARD_SLICE_SIZE
 
 # ==========================================
-# READ IMAGE.H
+# READ FILE
 # ==========================================
 
 text = Path(INPUT_FILE).read_text()
@@ -72,7 +72,7 @@ image = bytes(
 )
 
 # ==========================================
-# VALIDATE IMAGE SIZE
+# CHECK IMAGE SIZE
 # ==========================================
 
 if len(image) != IMAGE_SIZE:
@@ -87,7 +87,7 @@ print(f"Divisions: {DIVISIONS}")
 print(f"Bytes per division: {SLICE_SIZE}")
 
 # ==========================================
-# SPLIT IMAGE FOR EACH ESP32
+# Process for split image
 # ==========================================
 
 for board_id, (blade_a, blade_b) in enumerate(BOARDS, start=1):
